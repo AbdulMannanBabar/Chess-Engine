@@ -3,6 +3,7 @@
 #include <iostream>
 #include <cstdint>
 #include <vector>
+#include <algorithm>
 #include "Piece.h"
 #include "Board.h"
 
@@ -11,6 +12,8 @@ using namespace std;
 typedef uint64_t U64;
 
 // CONSTANTS
+const int SEARCH_DEPTH = 4;
+
 const int PAWN_VAL = 100;
 const int KNIGHT_VAL = 300;
 const int BISHOP_VAL = 300;
@@ -478,8 +481,6 @@ private:
 
 public:
 
-    static constexpr int SEARCH_DEPTH = 3;
-
     Engine() {}
 
 
@@ -508,7 +509,13 @@ public:
         // Handle checkmate and stalemate
         if (legalMoves.empty()) {
             if (board.isKingInCheck(blackToMove)) {
-                return blackToMove ? MATE_SCORE + depth : -MATE_SCORE - depth; // Prefer delivering checkmate sooner and delaying being mated
+
+                if (blackToMove) {
+                    return MATE_SCORE + depth;
+                }
+                else {
+                    return -MATE_SCORE - depth;
+                }; 
             }
 
             // No legal moves and not in check means stalemate
@@ -537,11 +544,11 @@ public:
                 UndoMove undo = board.makeMove(move);
 
                 int score = search(board, depth - 1, alpha, beta, true);
-
                 board.undoMove(undo);
 
-                bestScore = (score > bestScore) ? score : bestScore;
-                alpha = (bestScore > alpha) ? bestScore : alpha;
+                if (score > bestScore)  bestScore = score;
+                if (bestScore > alpha)  alpha = bestScore;
+                
 
                 // Alpha-beta pruning
                 if (alpha >= beta) {
@@ -560,11 +567,11 @@ public:
                 UndoMove undo = board.makeMove(move);
 
                 int score = search(board, depth - 1, alpha, beta, false);
-
                 board.undoMove(undo);
 
-                bestScore = (score < bestScore) ? score : bestScore;
-                beta = (bestScore < beta) ? bestScore : beta;
+                if (score < bestScore)  bestScore = score;
+                if (bestScore < beta)  beta = bestScore;
+                
 
                 // Alpha-beta pruning
                 if (alpha >= beta) {
@@ -581,9 +588,8 @@ public:
 
         const int INF = 1000000;
 
-        if (depth < 1) {
-            depth = 1;
-        }
+        if (depth < 1) depth = 1;
+        
 
         vector<Move> legalMoves = board.getAllLegalMoves(blackToMove);
 
@@ -595,31 +601,25 @@ public:
             return noMove;
         }
 
-        // Order root moves before searching them
-        moveOrdering(board, legalMoves);
+        Move bestMove = legalMoves[0]; 
 
-        Move bestMove = legalMoves[0]; // Starting with the first legal move as the current best one
-
-        int bestScore = blackToMove ? INF : -INF;
+        int bestScore;
+        if (blackToMove)  bestScore = INF;
+        else bestScore = -INF;
+        
 
         int alpha = -INF;
         int beta = INF;
 
         // Testing each move
-        for (const Move& move : legalMoves) {
+        for (int i = 0; i < legalMoves.size(); i++) {
 
+            Move move = legalMoves[i];
             UndoMove undo = board.makeMove(move);
 
-            int score = search(
-                board,
-                depth - 1,
-                alpha,
-                beta,
-                !blackToMove
-            );
-
-            // Restore the board before examining the next move
+            int score = search(board, depth - 1, alpha, beta, !blackToMove);
             board.undoMove(undo);
+
 
             if (!blackToMove) {
                 if (score > bestScore) {

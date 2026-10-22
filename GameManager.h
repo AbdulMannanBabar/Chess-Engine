@@ -40,9 +40,6 @@ public:
 		font.loadFromFile("Sprites/PressStart2P.ttf");
 	}
 
-	//void handleEvents();
-	//void update();
-
 
 	void handleMouseClick(int x, int y) {
 
@@ -113,7 +110,7 @@ public:
 				}
 			}
 
-			// If a promotion piece was selected, complete the move.
+			// If a promotion piece was selected, complete the move
 			if (promotionType != 0) {
 
 				promotionMove.promotion = promotionType;
@@ -125,12 +122,9 @@ public:
 				selectedPiece = nullptr;
 				highlightedMoves = 0;
 
-				// Let the engine respond if it is now its turn.
 				makeEngineMove();
 			}
 			else {
-				// Preserve the existing behavior: cancel the promotion menu
-				// when the user clicks outside its options.
 				promotionState = false;
 				selectedPiece = nullptr;
 				highlightedMoves = 0;
@@ -139,7 +133,7 @@ public:
 			return;
 		}
 
-		// Ignore clicks outside the chessboard.
+		// Ignore clicks outside the chessboard
 		if (x < 200 || x >= 1000 || y < 100 || y >= 900) {
 			selectedPiece = nullptr;
 			highlightedMoves = 0;
@@ -156,7 +150,7 @@ public:
 
 			U64 bit = (U64)1 << square;
 
-			// If the clicked square is a legal destination, move there.
+			// If the clicked square is a legal destination, move there
 			if ((highlightedMoves & bit) != 0) {
 
 				Move m;
@@ -179,12 +173,12 @@ public:
 					selectedPiece = nullptr;
 					highlightedMoves = 0;
 
-					// Respond immediately after the human's move.
+					// Respond immediately after the player's move
+					display();
 					makeEngineMove();
 				}
 				else {
-
-					// Store the move and wait for the promotion choice.
+					// Store the move and wait for the promotion choice
 					promotionMove = m;
 
 					selectedPiece = nullptr;
@@ -200,13 +194,12 @@ public:
 		Piece* pieceOnSquare = board.getSquare(square);
 
 		if (!pieceOnSquare) {
-			// Clicking an empty square removes highlights.
+			// Clicking an empty square removes highlights
 			selectedPiece = nullptr;
 			highlightedMoves = 0;
 			return;
 		}
 
-		// Do not allow selecting the opponent's pieces.
 		if (pieceOnSquare->isBlack() == whiteToMove) {
 			return;
 		}
@@ -310,7 +303,6 @@ public:
 				RectangleShape square(sf::Vector2f(tileSize, tileSize));
 				square.setPosition(x * tileSize, y * tileSize);
 
-				// alternating colors
 				if ((x + y) % 2 == 0)
 					square.setFillColor(Color(240, 217, 181)); // light
 				else
