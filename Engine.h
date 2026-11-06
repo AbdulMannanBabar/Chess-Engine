@@ -3,9 +3,9 @@
 #include <iostream>
 #include <cstdint>
 #include <vector>
-#include <algorithm>
 #include "Piece.h"
 #include "Board.h"
+#include "Zobrist.h"
 
 using namespace std;
 
@@ -76,7 +76,7 @@ private:
     int evaluatePieceSquare(Board& board) {
 
 
-        // these are the PST Tables for white. for black these will get mirrored
+        // these are the PST Tables for white, for black these will get mirrored
         static const int pawnTable[64] = {
               0,   0,   0,   0,   0,   0,   0,   0,
              50,  50,  50,  50,  50,  50,  50,  50,
@@ -477,7 +477,20 @@ private:
         return whiteShelter - blackShelter;
     }
 
+    bool isDrawByRepetition(vector<U64>& positionHistory) {
+        if (positionHistory.empty())
+            return false;
 
+        U64 currentHash = positionHistory.back();
+        int repetitions = 0;
+
+        for (int i = 0; i < positionHistory.size(); i++) {
+            if (positionHistory[i] == currentHash)
+                repetitions++;
+        }
+
+        return repetitions >= 3;
+    }
 
 public:
 
@@ -499,10 +512,14 @@ public:
     }
 
 
-    int search(Board& board, int depth, int alpha, int beta, bool blackToMove) {
+    int search(Board& board, int depth, int alpha, int beta, bool blackToMove,
+        vector<U64>& positionHistory, Zobrist& zobrist) {
 
         const int MATE_SCORE = 100000;
         const int INF = 1000000;
+
+        if (isDrawByRepetition(positionHistory))
+            return 0;
 
         vector<Move> legalMoves = board.getAllLegalMoves(blackToMove);
 
@@ -515,18 +532,16 @@ public:
                 }
                 else {
                     return -MATE_SCORE - depth;
-                }; 
+                };
             }
 
             // No legal moves and not in check means stalemate
             return 0;
         }
 
-
         if (board.isInsufficientMaterial()) {
             return 0;
         }
-
 
         if (depth <= 0) {
             return evaluate(board);
@@ -543,12 +558,17 @@ public:
                 const Move& move = legalMoves[i];
                 UndoMove undo = board.makeMove(move);
 
-                int score = search(board, depth - 1, alpha, beta, true);
+                U64 hash = zobrist.hashPosition(board, true);
+                positionHistory.push_back(hash);
+
+                int score = search(board, depth - 1, alpha, beta, true,
+                    positionHistory, zobrist);
+
+                positionHistory.pop_back();
                 board.undoMove(undo);
 
                 if (score > bestScore)  bestScore = score;
                 if (bestScore > alpha)  alpha = bestScore;
-                
 
                 // Alpha-beta pruning
                 if (alpha >= beta) {
@@ -566,12 +586,17 @@ public:
                 const Move& move = legalMoves[i];
                 UndoMove undo = board.makeMove(move);
 
-                int score = search(board, depth - 1, alpha, beta, false);
+                U64 hash = zobrist.hashPosition(board, false);
+                positionHistory.push_back(hash);
+
+                int score = search(board, depth - 1, alpha, beta, false,
+                    positionHistory, zobrist);
+
+                positionHistory.pop_back();
                 board.undoMove(undo);
 
                 if (score < bestScore)  bestScore = score;
                 if (bestScore < beta)  beta = bestScore;
-                
 
                 // Alpha-beta pruning
                 if (alpha >= beta) {
@@ -584,12 +609,12 @@ public:
     }
 
 
-    Move findBestMove(Board& board, bool blackToMove, int depth = SEARCH_DEPTH) {
+    Move findBestMove(Board& board, bool blackToMove, int depth,
+        vector<U64>& gameHistory, Zobrist& zobrist) {
 
         const int INF = 1000000;
 
         if (depth < 1) depth = 1;
-        
 
         vector<Move> legalMoves = board.getAllLegalMoves(blackToMove);
 
@@ -601,12 +626,14 @@ public:
             return noMove;
         }
 
-        Move bestMove = legalMoves[0]; 
+        // Create a separate history for the engine's search
+        vector<U64> searchHistory = gameHistory;
+
+        Move bestMove = legalMoves[0];
 
         int bestScore;
         if (blackToMove)  bestScore = INF;
         else bestScore = -INF;
-        
 
         int alpha = -INF;
         int beta = INF;
@@ -617,9 +644,14 @@ public:
             Move move = legalMoves[i];
             UndoMove undo = board.makeMove(move);
 
-            int score = search(board, depth - 1, alpha, beta, !blackToMove);
-            board.undoMove(undo);
+            U64 hash = zobrist.hashPosition(board, !blackToMove);
+            searchHistory.push_back(hash);
 
+            int score = search(board, depth - 1, alpha, beta, !blackToMove,
+                searchHistory, zobrist);
+
+            searchHistory.pop_back();
+            board.undoMove(undo);
 
             if (!blackToMove) {
                 if (score > bestScore) {

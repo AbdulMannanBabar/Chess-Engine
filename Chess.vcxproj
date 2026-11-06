@@ -143,6 +143,7 @@
     <ClInclude Include="Engine.h" />
     <ClInclude Include="GameManager.h" />
     <ClInclude Include="Piece.h" />
+    <ClInclude Include="Zobrist.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp" />

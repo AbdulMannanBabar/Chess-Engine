@@ -1,6 +1,7 @@
 #pragma once
 #include <iostream>
 #include <cstdint>
+#include <vector>
 #include <SFML/Audio.hpp>
 #include <SFML/Graphics.hpp>
 #include <SFML/Window/Keyboard.hpp>
@@ -9,6 +10,7 @@
 #include "Engine.h"
 #include "Piece.h"
 #include "Board.h"
+#include "Zobrist.h"
 using namespace sf;
 
 class GameManager {
@@ -32,6 +34,11 @@ private:
 	Engine engine;
 	bool colorSelection = true;
 	bool humanPlaysWhite = true;
+
+	// vectors to store move and position histories of the game
+	vector<Move> moveHistory;
+	vector<U64> positionHistory;
+	Zobrist zobrist;
 
 public:
 	GameManager(Board& board): window(VideoMode(1200, 1000), "Chess Engine"), board(board), selectedPiece(nullptr), highlightedMoves(0), whiteToMove(true), promotionState(false), colorSelection(true), humanPlaysWhite(true) {
@@ -115,7 +122,7 @@ public:
 
 				promotionMove.promotion = promotionType;
 				board.makeMove(promotionMove);
-
+				recordMove(promotionMove);
 				whiteToMove = !whiteToMove;
 
 				promotionState = false;
@@ -167,7 +174,7 @@ public:
 				if (!promotion) {
 
 					board.makeMove(m);
-
+					recordMove(m);
 					whiteToMove = !whiteToMove;
 
 					selectedPiece = nullptr;
@@ -486,27 +493,47 @@ public:
 			text.setString("Insufficient Material");
 			window.draw(text);
 		}
+		if (isDrawByRepetition()) {
+			Text text;
+			text.setFont(font);
+			text.setCharacterSize(48);
+			text.setFillColor(Color::Red);
+			text.setPosition(420, 400);
+
+			text.setString("Draw by ");
+			window.draw(text);
+
+			text.setPosition(350, 500);
+			text.setString("Repetition");
+			window.draw(text);
+		}
 
 		window.display();
 	}
 
 	bool isGameOver() {
-		return board.isCheckmate(!whiteToMove) || board.isStalemate(!whiteToMove) || board.isInsufficientMaterial();
+		return board.isCheckmate(!whiteToMove) || board.isStalemate(!whiteToMove) || board.isInsufficientMaterial() || isDrawByRepetition();
 	}
 
 
 	void startGame(bool playWhite) {
 
+		moveHistory.clear();
+		positionHistory.clear();
+
 		humanPlaysWhite = playWhite;
 		whiteToMove = true;
+
+		positionHistory.push_back(zobrist.hashPosition(board, false));
 
 		colorSelection = false;
 		selectedPiece = nullptr;
 		highlightedMoves = 0;
 		promotionState = false;
 
-		// If the human chose Black, the engine plays White first.
+		
 		if (!humanPlaysWhite) {
+			display();
 			makeEngineMove();
 		}
 	}
@@ -526,7 +553,7 @@ public:
 		// whiteToMove is true for White and false for Black.
 		bool blackToMove = !whiteToMove;
 
-		Move bestMove = engine.findBestMove(board, blackToMove);
+		Move bestMove = engine.findBestMove(board, blackToMove, SEARCH_DEPTH, positionHistory, zobrist);
 
 		// Check that the engine returned a valid move.
 		if (bestMove.from < 0 || bestMove.from >= 64 || bestMove.to < 0 || bestMove.to >= 64) {
@@ -534,9 +561,34 @@ public:
 		}
 
 		board.makeMove(bestMove);
+		recordMove(bestMove);
 
 		whiteToMove = !whiteToMove;
 		selectedPiece = nullptr;
 		highlightedMoves = 0;
+	}
+
+	void recordMove(const Move& move) {
+
+		moveHistory.push_back(move);
+		U64 hash = zobrist.hashPosition(board, !whiteToMove);
+		positionHistory.push_back(hash);
+	}
+
+	bool isDrawByRepetition() {
+
+		if (positionHistory.empty()) return false;
+
+		U64 currentPosition = positionHistory.back();
+		int repetitions = 0;
+
+		for (int i = 0; i < positionHistory.size(); i++) {
+
+			if (positionHistory[i] == currentPosition) {
+				repetitions++;
+			}
+		}
+
+		return repetitions >= 3;
 	}
 };

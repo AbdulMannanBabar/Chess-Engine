@@ -167,6 +167,22 @@ public:
 		return enPassantSquare;
 	}
 
+	bool getWhiteKingsideCastle() const {
+		return whiteKingsideCastle;
+	}
+
+	bool getWhiteQueensideCastle() const {
+		return whiteQueensideCastle;
+	}
+
+	bool getBlackKingsideCastle() const {
+		return blackKingsideCastle;
+	}
+
+	bool getBlackQueensideCastle() const {
+		return blackQueensideCastle;
+	}
+
 	void updateBitboard(Move move, U64& bitboard) {
 
 		U64 newSquare = (U64)1 << move.to;
@@ -787,6 +803,7 @@ public:
 		return false;
 	}
 
+
 	vector<Move> getAllLegalMoves(bool black) {
 
 		vector<Move> moves;
@@ -818,8 +835,7 @@ public:
 				char type = pieces[i]->getType();
 
 				// Pawn promotion
-				if ((type == 'P' && to >= 56) ||
-					(type == 'p' && to <= 7)) {
+				if ((type == 'P' && to >= 56) || (type == 'p' && to <= 7)) {
 
 					if (type == 'P') {
 						m.promotion = 'Q';
